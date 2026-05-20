@@ -262,15 +262,57 @@ function Notification({ msg, onClose }) {
 }
 
 function MapEmbed({ shop }) {
-  const query = encodeURIComponent(shop ? shop.address : "Dublin City Centre, Ireland");
+  const mapId = `map-${shop ? shop.id : "default"}`;
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const existing = document.getElementById(mapId);
+    if (!existing) return;
+    if (existing._leafletMap) {
+      existing._leafletMap.remove();
+      existing._leafletMap = null;
+    }
+    const lat = shop?.lat || 53.3498;
+    const lng = shop?.lng || -6.2603;
+    const loadLeaflet = () => {
+      if (!window.L) {
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+        document.head.appendChild(link);
+        const script = document.createElement("script");
+        script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+        script.onload = () => initMap();
+        document.head.appendChild(script);
+      } else {
+        initMap();
+      }
+    };
+    const initMap = () => {
+      const L = window.L;
+      const map = L.map(mapId, { zoomControl: true, scrollWheelZoom: false }).setView([lat, lng], 16);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a>',
+        maxZoom: 19,
+      }).addTo(map);
+      const icon = L.divIcon({
+        html: `<div style="background:#C8A97E;color:#0A0A0A;border-radius:8px;padding:4px 10px;font-size:12px;font-weight:500;font-family:DM Sans,sans-serif;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.3);">✂ ${shop?.name || "Barbershop"}</div>`,
+        className: "",
+        iconAnchor: [60, 10],
+      });
+      L.marker([lat, lng], { icon }).addTo(map);
+      existing._leafletMap = map;
+    };
+    loadLeaflet();
+    return () => {
+      if (existing._leafletMap) {
+        existing._leafletMap.remove();
+        existing._leafletMap = null;
+      }
+    };
+  }, [shop?.id]);
   return (
-    <div className="map-frame" style={{height:300}}>
-      <iframe
-        title={shop ? shop.name : "Dublin map"}
-        width="100%" height="300" style={{border:0,display:"block"}}
-        loading="lazy" referrerPolicy="no-referrer-when-downgrade"
-        src={`https://www.google.com/maps/embed/v1/place?key=YOUR_GOOGLE_MAPS_API_KEY&q=${query}&zoom=15&maptype=roadmap`}
-      />
+    <div className="map-frame" style={{height:300,position:"relative"}}>
+      <div id={mapId} style={{height:"100%",width:"100%",borderRadius:16}}/>
     </div>
   );
 }
@@ -315,7 +357,49 @@ function CalWidget({ barber, selectedDate, onSelectDate }) {
   );
 }
 
-// ─── FIND PAGE ────────────────────────────────────────────────────────────────
+function AllShopsMap({ shops, onSelectShop }) {
+  const mapId = "all-shops-map";
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const existing = document.getElementById(mapId);
+    if (!existing) return;
+    if (existing._leafletMap) { existing._leafletMap.remove(); existing._leafletMap = null; }
+    const loadLeaflet = () => {
+      if (!window.L) {
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+        document.head.appendChild(link);
+        const script = document.createElement("script");
+        script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+        script.onload = () => initMap();
+        document.head.appendChild(script);
+      } else { initMap(); }
+    };
+    const initMap = () => {
+      const L = window.L;
+      const map = L.map(mapId, { zoomControl: true, scrollWheelZoom: false }).setView([53.3470, -6.2590], 14);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a>', maxZoom: 19,
+      }).addTo(map);
+      shops.forEach(shop => {
+        const icon = L.divIcon({
+          html: `<div style="background:#1C1C1C;color:#C8A97E;border:1.5px solid #C8A97E;border-radius:8px;padding:4px 10px;font-size:11px;font-weight:500;font-family:DM Sans,sans-serif;white-space:nowrap;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.4);">✂ ${shop.name}</div>`,
+          className: "", iconAnchor: [60, 14],
+        });
+        L.marker([shop.lat, shop.lng], { icon }).addTo(map).on("click", () => onSelectShop(shop));
+      });
+      existing._leafletMap = map;
+    };
+    loadLeaflet();
+    return () => { if (existing._leafletMap) { existing._leafletMap.remove(); existing._leafletMap = null; } };
+  }, []);
+  return (
+    <div className="map-frame" style={{height:260,marginBottom:20,position:"relative"}}>
+      <div id={mapId} style={{height:"100%",width:"100%",borderRadius:16}}/>
+    </div>
+  );
+}
 function FindPage({ onSelectShop, onSelectBarber }) {
   const [search, setSearch] = useState("");
   const [mode, setMode] = useState("shops"); // "shops" | "barbers"
@@ -364,6 +448,12 @@ function FindPage({ onSelectShop, onSelectBarber }) {
           <button key={f} className={`chip${filter===f?" selected":""}`} onClick={()=>setFilter(f)}>{f}</button>
         ))}
       </div>
+
+      {mode==="shops" && (
+        <div style={{marginBottom:16}}>
+          <AllShopsMap shops={filteredShops} onSelectShop={onSelectShop}/>
+        </div>
+      )}
 
       {mode==="shops" && (
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
