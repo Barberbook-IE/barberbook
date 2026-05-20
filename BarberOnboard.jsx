@@ -53,9 +53,41 @@ const css = `
 
 const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
 const CALENDAR_SYSTEMS = [
-  { id: "calendly", label: "Calendly", desc: "Connect your Calendly account" },
-  { id: "google", label: "Google Calendar", desc: "Sync with Google Calendar" },
-  { id: "manual", label: "Manual slots", desc: "We'll set up your availability manually" },
+  {
+    id: "calendly",
+    label: "Calendly",
+    icon: "📅",
+    desc: "Connect your Calendly account — we pull live availability automatically",
+    badge: null,
+  },
+  {
+    id: "resurva",
+    label: "Resurva",
+    icon: "✂",
+    desc: "Used by many Irish barbershops — customers book via your Resurva page embedded in BarberBook",
+    badge: "Popular with Irish barbers",
+  },
+  {
+    id: "google",
+    label: "Google Calendar",
+    icon: "🗓",
+    desc: "Sync with Google Calendar via a one-click OAuth connection after signup",
+    badge: null,
+  },
+  {
+    id: "ical",
+    label: "iCal Feed",
+    icon: "🔗",
+    desc: "Works with any system that exports iCal — we poll your feed every 15 minutes",
+    badge: "Universal",
+  },
+  {
+    id: "manual",
+    label: "Manual availability",
+    icon: "🕐",
+    desc: "Set your open days and hours — we manage your slots directly in BarberBook",
+    badge: null,
+  },
 ];
 
 const SPECIALTIES = ["Classic Cuts","Skin Fades","Beard Work","Hot Towel Shave","Colouring","Kids Cuts","Open Razor Shave","Restyling","Hair Design"];
@@ -133,6 +165,8 @@ function OnboardForm({ onSubmit }) {
     // Step 3 — Availability
     calendarSystem: "",
     calendlyUrl: "",
+    resurvaUrl: "",
+    icalUrl: "",
     openDays: [],
     openFrom: "09:00",
     openTo: "18:00",
@@ -343,40 +377,91 @@ function OnboardForm({ onSubmit }) {
         <div className="fade-in">
           <div style={{ marginBottom: 24 }}>
             <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 22, fontWeight: 600, marginBottom: 4 }}>How do you manage bookings?</div>
-            <div style={{ fontSize: 13, color: P.muted }}>We sync with your existing calendar so bookings stay in one place</div>
+            <div style={{ fontSize: 13, color: P.muted }}>We work with your existing system — nothing needs to change on your end</div>
           </div>
+
           <div className="card" style={{ marginBottom: 16 }}>
-            <div className="section-label">Calendar System</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
+            <div className="section-label">Your booking system</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
               {CALENDAR_SYSTEMS.map(c => (
                 <div key={c.id} onClick={() => u("calendarSystem", c.id)}
                   style={{ border: `1px solid ${form.calendarSystem===c.id?P.gold:P.border}`, borderRadius: 10, padding: "14px 16px", cursor: "pointer", background: form.calendarSystem===c.id?"rgba(200,169,126,0.06)":P.surface, transition: "all 0.2s" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{ width: 18, height: 18, borderRadius: "50%", border: `2px solid ${form.calendarSystem===c.id?P.gold:P.border}`, background: form.calendarSystem===c.id?P.gold:"transparent", flexShrink: 0 }}/>
-                    <div>
-                      <div style={{ fontWeight: 500, fontSize: 14 }}>{c.label}</div>
-                      <div style={{ fontSize: 12, color: P.muted }}>{c.desc}</div>
+                    <div style={{ width: 20, height: 20, borderRadius: "50%", border: `2px solid ${form.calendarSystem===c.id?P.gold:P.border}`, background: form.calendarSystem===c.id?P.gold:"transparent", flexShrink: 0, transition: "all 0.2s" }}/>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 15 }}>{c.icon}</span>
+                        <span style={{ fontWeight: 500, fontSize: 14 }}>{c.label}</span>
+                        {c.badge && <span style={{ fontSize: 10, background: "rgba(200,169,126,0.15)", color: P.gold, borderRadius: 4, padding: "2px 7px", fontWeight: 500 }}>{c.badge}</span>}
+                      </div>
+                      <div style={{ fontSize: 12, color: P.muted, marginTop: 2 }}>{c.desc}</div>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
             {errors.calendarSystem && <div className="error">{errors.calendarSystem}</div>}
+
+            {/* Calendly */}
             {form.calendarSystem === "calendly" && (
-              <div className="input-group" style={{ marginBottom: 0 }}>
-                <label>Your Calendly URL</label>
-                <input value={form.calendlyUrl} onChange={e => u("calendlyUrl", e.target.value)} placeholder="calendly.com/yourshop"/>
-                <div className="hint">We'll pull your live availability directly from Calendly. New bookings appear in both places automatically.</div>
+              <div style={{ background: P.surface, borderRadius: 10, padding: 16, border: `1px solid ${P.border}` }}>
+                <div className="input-group" style={{ marginBottom: 0 }}>
+                  <label>Your Calendly URL</label>
+                  <input value={form.calendlyUrl} onChange={e => u("calendlyUrl", e.target.value)} placeholder="calendly.com/yourshopname"/>
+                  <div className="hint">We pull your real-time availability from Calendly. When a customer books via BarberBook, the event is created in your Calendly automatically.</div>
+                </div>
               </div>
             )}
+
+            {/* Resurva */}
+            {form.calendarSystem === "resurva" && (
+              <div style={{ background: P.surface, borderRadius: 10, padding: 16, border: `1px solid ${P.border}` }}>
+                <div className="input-group" style={{ marginBottom: 12 }}>
+                  <label>Your Resurva booking URL</label>
+                  <input value={form.resurvaUrl} onChange={e => u("resurvaUrl", e.target.value)} placeholder="app.resurva.com/book/yourshop"/>
+                  <div className="hint">Find this in your Resurva dashboard under Settings → Booking Page.</div>
+                </div>
+                <div style={{ background: "rgba(200,169,126,0.08)", border: `1px solid rgba(200,169,126,0.2)`, borderRadius: 8, padding: 12, fontSize: 12, color: P.muted, lineHeight: 1.6 }}>
+                  <div style={{ color: P.gold, fontWeight: 500, marginBottom: 6 }}>How Resurva works on BarberBook</div>
+                  <div>Your shop and barbers appear normally in search and on the map. When a customer taps Book, your Resurva booking page opens directly — they complete the booking in Resurva as usual. You manage everything from your existing Resurva dashboard. No change to your workflow.</div>
+                  <div style={{ marginTop: 8, color: P.muted }}>Note: Once Resurva releases their public API, we'll upgrade this to a seamless in-app booking experience automatically.</div>
+                </div>
+              </div>
+            )}
+
+            {/* Google Calendar */}
             {form.calendarSystem === "google" && (
-              <div style={{ background: P.surface, borderRadius: 10, padding: 16, fontSize: 13, color: P.muted, border: `1px solid ${P.border}` }}>
-                After submission, we'll send you a link to connect your Google Calendar via OAuth. Takes about 2 minutes.
+              <div style={{ background: P.surface, borderRadius: 10, padding: 16, border: `1px solid ${P.border}` }}>
+                <div style={{ fontSize: 13, color: P.muted, lineHeight: 1.7, marginBottom: 10 }}>
+                  After your application is approved, we'll email you a secure Google OAuth link. Click it, choose your calendar, and availability syncs in real time. Takes about 2 minutes.
+                </div>
+                <div style={{ fontSize: 12, color: P.muted, background: "rgba(200,169,126,0.06)", borderRadius: 8, padding: 10, border: `1px solid ${P.border}` }}>
+                  ✓ Works with personal and Google Workspace accounts<br/>
+                  ✓ We only read availability — we never modify your calendar<br/>
+                  ✓ New bookings via BarberBook are added as calendar events automatically
+                </div>
               </div>
             )}
+
+            {/* iCal */}
+            {form.calendarSystem === "ical" && (
+              <div style={{ background: P.surface, borderRadius: 10, padding: 16, border: `1px solid ${P.border}` }}>
+                <div className="input-group" style={{ marginBottom: 12 }}>
+                  <label>Your iCal feed URL</label>
+                  <input value={form.icalUrl} onChange={e => u("icalUrl", e.target.value)} placeholder="webcal://yourapp.com/calendar.ics"/>
+                  <div className="hint">Works with Outlook, Apple Calendar, Acuity, Square Appointments, and most booking software. Find the iCal export link in your app's settings.</div>
+                </div>
+                <div style={{ fontSize: 12, color: P.muted, lineHeight: 1.6 }}>We check your feed every 15 minutes and update your availability on BarberBook automatically. Not sure where to find your iCal URL? <span style={{ color: P.gold }}>Email us and we'll help.</span></div>
+              </div>
+            )}
+
+            {/* Manual */}
             {form.calendarSystem === "manual" && (
-              <div>
-                <div className="section-label" style={{ marginTop: 16 }}>Open Days</div>
+              <div style={{ background: P.surface, borderRadius: 10, padding: 16, border: `1px solid ${P.border}` }}>
+                <div style={{ fontSize: 13, color: P.muted, marginBottom: 14, lineHeight: 1.6 }}>
+                  Set your standard open days and hours. Once you're live, you can update availability anytime from your BarberBook dashboard.
+                </div>
+                <div style={{ fontSize: 12, color: P.gold, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 500, marginBottom: 10 }}>Open Days</div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
                   {DAYS.map(d => (
                     <button key={d} className={`chip${form.openDays.includes(d)?" selected":""}`}
@@ -396,6 +481,7 @@ function OnboardForm({ onSubmit }) {
               </div>
             )}
           </div>
+
           <div style={{ display: "flex", gap: 10 }}>
             <button className="ghost-btn" onClick={back}>← Back</button>
             <button className="gold-btn" style={{ flex: 1 }} onClick={next}>Continue → Review & Submit</button>
@@ -434,9 +520,18 @@ function OnboardForm({ onSubmit }) {
               </div>
             ))}
           </div>
-          <div className="card" style={{ marginBottom: 20 }}>
-            <div className="section-label">Calendar</div>
-            <div style={{ fontSize: 13, color: P.muted }}>{CALENDAR_SYSTEMS.find(c=>c.id===form.calendarSystem)?.label || "—"}{form.calendlyUrl?` · ${form.calendlyUrl}`:""}</div>
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div className="section-label">Calendar & Availability</div>
+            <div style={{ fontSize: 13, color: P.muted }}>
+              {CALENDAR_SYSTEMS.find(c=>c.id===form.calendarSystem)?.icon} {CALENDAR_SYSTEMS.find(c=>c.id===form.calendarSystem)?.label || "—"}
+            </div>
+            {form.calendarSystem==="calendly" && form.calendlyUrl && <div style={{ fontSize: 12, color: P.muted, marginTop: 4 }}>{form.calendlyUrl}</div>}
+            {form.calendarSystem==="resurva" && form.resurvaUrl && <div style={{ fontSize: 12, color: P.muted, marginTop: 4 }}>{form.resurvaUrl}</div>}
+            {form.calendarSystem==="ical" && form.icalUrl && <div style={{ fontSize: 12, color: P.muted, marginTop: 4 }}>{form.icalUrl}</div>}
+            {form.calendarSystem==="resurva" && <div style={{ fontSize: 11, color: P.gold, marginTop: 6 }}>Customers will book via your Resurva page</div>}
+            {form.calendarSystem==="google" && <div style={{ fontSize: 11, color: P.gold, marginTop: 6 }}>OAuth connection email sent after approval</div>}
+            {form.calendarSystem==="manual" && form.openDays.length>0 && <div style={{ fontSize: 12, color: P.muted, marginTop: 4 }}>{form.openDays.map(d=>d.slice(0,3)).join(", ")} · {form.openFrom}–{form.openTo}</div>}
+            {form.openingHours && <div style={{ fontSize: 12, color: P.muted, marginTop: 4 }}>{form.openingHours}</div>}
           </div>
           <div style={{ marginBottom: 20 }}>
             <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer", marginBottom: 12 }}>

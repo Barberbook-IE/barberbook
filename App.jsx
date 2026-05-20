@@ -8,6 +8,7 @@ const SHOPS = [
     address: "27 South William Street, Dublin 2, D02 RP86",
     phone: "+353 1 679 8322",
     website: "thefireplacebarbershop.com",
+    calendarSystem: "calendly",
     lat: 53.3418,
     lng: -6.2628,
     rating: 4.9,
@@ -102,6 +103,7 @@ const SHOPS = [
     address: "9 Store Street, Dublin 1, D01 C9X2",
     phone: "+353 85 777 2977",
     website: "area9.ie",
+    calendarSystem: "google",
     lat: 53.3497,
     lng: -6.2513,
     rating: 4.6,
@@ -140,6 +142,8 @@ const SHOPS = [
     address: "Unit 9 James Joyce Street, Dublin 1, D01 K7N1",
     phone: "+353 83 088 2425",
     website: "blackbearddublin.ie",
+    calendarSystem: "resurva",
+    resurvaUrl: "https://app.resurva.com/book/blackbeard-dublin",
     lat: 53.3512,
     lng: -6.2560,
     rating: 4.9,
@@ -159,7 +163,7 @@ const SHOPS = [
           { id: 4, name: "Cut & Beard", duration: 55, price: 45 },
           { id: 5, name: "Head Shave", duration: 30, price: 25 },
         ],
-        slots: { "2026-05-20": ["09:00","10:00","11:30","13:00","15:00","17:00","19:00"], "2026-05-21": ["09:00","10:30","12:00","14:00","16:00","18:00"], "2026-05-22": ["09:30","11:00","13:00","15:30","17:30","19:00"], "2026-05-23": ["09:00","10:30","12:30","14:00","16:00","18:30"] }
+        slots: {}
       },
       { id: "bb-rob", name: "Rob", role: "Senior Barber", specialty: "Texture & Style", experience: "6+ years", rating: 4.9, reviews: 189, priceFrom: 26, avatar: "RB", color: "#2A2A4E",
         services: [
@@ -168,7 +172,7 @@ const SHOPS = [
           { id: 3, name: "Beard Trim", duration: 20, price: 18 },
           { id: 4, name: "Hot Towel Shave", duration: 35, price: 28 },
         ],
-        slots: { "2026-05-20": ["09:30","11:00","12:30","14:00","16:30","18:30"], "2026-05-21": ["09:00","10:30","12:00","14:30","16:00","18:30"], "2026-05-22": ["09:00","11:30","13:00","15:00","17:00","19:00"], "2026-05-23": ["09:30","11:00","13:30","15:30","17:30"] }
+        slots: {}
       },
     ]
   },
@@ -448,6 +452,9 @@ function ShopPage({ shop, onBack, onSelectBarber }) {
             </div>
             <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
               {shop.tags.map(t=><span key={t} className="tag">{t}</span>)}
+              {shop.calendarSystem==="resurva"&&<span style={{display:"inline-block",background:"rgba(90,120,200,0.12)",color:"#7A9FE0",borderRadius:4,padding:"2px 8px",fontSize:11,fontWeight:500}}>✂ Books via Resurva</span>}
+              {shop.calendarSystem==="calendly"&&<span style={{display:"inline-block",background:"rgba(0,180,120,0.1)",color:"#00C896",borderRadius:4,padding:"2px 8px",fontSize:11,fontWeight:500}}>📅 Live availability</span>}
+              {shop.calendarSystem==="google"&&<span style={{display:"inline-block",background:"rgba(66,133,244,0.1)",color:"#4285F4",borderRadius:4,padding:"2px 8px",fontSize:11,fontWeight:500}}>🗓 Google Calendar</span>}
             </div>
           </div>
         </div>
@@ -516,13 +523,64 @@ function ShopPage({ shop, onBack, onSelectBarber }) {
 
 // ─── BARBER PAGE ──────────────────────────────────────────────────────────────
 function BarberPage({ barber, shop, onBack, onConfirm }) {
-  const [step, setStep] = useState(0); // 0=service, 1=datetime, 2=review
+  const [step, setStep] = useState(0);
   const [service, setService] = useState(null);
   const [date, setDate] = useState("");
   const [slot, setSlot] = useState("");
   const [notes, setNotes] = useState("");
   const steps = ["Service","Date & Time","Review"];
   const slots = barber.slots?.[date] || [];
+  const isResurva = shop.calendarSystem === "resurva";
+
+  // ── Resurva shops: send to their booking page ──────────────────────────────
+  if (isResurva) return (
+    <div className="fade-in">
+      <div className="breadcrumb">
+        <button className="back-btn" onClick={()=>onBack("shop")}>← {shop.name}</button>
+        <span className="sep">›</span>
+        <span>{barber.name}</span>
+      </div>
+      <div style={{display:"flex",gap:14,alignItems:"center",padding:"14px 18px",background:P.surface,borderRadius:14,border:`1px solid ${P.border}`,marginBottom:24}}>
+        <Av initials={barber.avatar} color={barber.color} size={52}/>
+        <div style={{flex:1}}>
+          <div style={{fontWeight:500,fontSize:15}}>{barber.name}</div>
+          <div style={{fontSize:12,color:P.gold}}>{barber.role} · {shop.name}</div>
+          <div style={{fontSize:12,color:P.muted,marginTop:2}}>{barber.specialty}</div>
+        </div>
+        <div style={{textAlign:"right"}}>
+          <Stars rating={barber.rating} small/>
+          <div style={{fontSize:11,color:P.muted}}>{barber.reviews} reviews</div>
+          <div style={{color:P.gold,fontWeight:600,marginTop:4}}>from €{barber.priceFrom}</div>
+        </div>
+      </div>
+      <div className="card" style={{textAlign:"center",padding:"32px 24px"}}>
+        <div style={{fontSize:32,marginBottom:16}}>✂</div>
+        <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:600,marginBottom:8}}>Book with {barber.name}</div>
+        <div style={{fontSize:13,color:P.muted,lineHeight:1.7,marginBottom:6,maxWidth:380,margin:"0 auto 16px"}}>
+          {shop.name} manages bookings through <strong style={{color:P.text}}>Resurva</strong>. Tapping below opens their booking page where you can select your service, date, and time directly.
+        </div>
+        <div style={{background:P.surface,borderRadius:10,padding:14,marginBottom:20,border:`1px solid ${P.border}`}}>
+          <div style={{fontSize:12,color:P.muted,marginBottom:8}}>Services available from €{barber.priceFrom}</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6,justifyContent:"center"}}>
+            {barber.services.map(s=>(
+              <span key={s.id} style={{fontSize:12,background:P.card,border:`1px solid ${P.border}`,borderRadius:6,padding:"4px 10px",color:P.muted}}>{s.name} · €{s.price}</span>
+            ))}
+          </div>
+        </div>
+        <a href={shop.resurvaUrl || `https://app.resurva.com/book/${shop.id}`} target="_blank" rel="noopener noreferrer"
+          style={{display:"inline-block",background:P.gold,color:"#0A0A0A",border:"none",borderRadius:8,padding:"13px 32px",fontWeight:500,fontSize:15,textDecoration:"none",cursor:"pointer",transition:"all 0.2s"}}>
+          Book on Resurva →
+        </a>
+        <div style={{fontSize:11,color:P.muted,marginTop:14}}>
+          Opens in a new tab · You'll complete your booking on {shop.name}'s Resurva page
+        </div>
+      </div>
+      <div style={{background:"rgba(200,169,126,0.06)",border:`1px solid rgba(200,169,126,0.15)`,borderRadius:10,padding:14,marginTop:16,fontSize:12,color:P.muted,lineHeight:1.6}}>
+        <span style={{color:P.gold,fontWeight:500}}>Note: </span>
+        Resurva doesn't yet have a public API. Once they release it, booking {shop.name} will work fully in-app without leaving BarberBook.
+      </div>
+    </div>
+  );
 
   return (
     <div className="fade-in">
