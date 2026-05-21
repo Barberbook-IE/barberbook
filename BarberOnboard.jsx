@@ -1,5 +1,5 @@
 // BarberOnboard.jsx — Full barber signup & admin review flow
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { saveApplication } from "./supabase.js";
 
 const P = {
@@ -588,11 +588,26 @@ function SuccessPage({ shopName }) {
 
 // ─── ADMIN PANEL ──────────────────────────────────────────────────────────────
 function AdminPanel() {
-  const [apps, setApps] = useState(MOCK_APPLICATIONS);
+  const [apps, setApps] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState(null);
   const [filter, setFilter] = useState("all");
   const [password, setPassword] = useState("");
   const [authed, setAuthed] = useState(false);
+
+  const loadApps = async () => {
+    setLoading(true);
+    const { supabase } = await import("./supabase.js");
+    const { data, error } = await supabase
+      .from("applications")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) console.error("Load error:", error);
+    else setApps(data || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { if (authed) loadApps(); }, [authed]);
 
   if (!authed) return (
     <div style={{ maxWidth: 360, margin: "60px auto", textAlign: "center" }}>
@@ -607,7 +622,13 @@ function AdminPanel() {
     </div>
   );
 
-  const update = (id, status) => {
+  const update = async (id, status) => {
+    const { supabase } = await import("./supabase.js");
+    const { error } = await supabase
+      .from("applications")
+      .update({ status, reviewed_at: new Date().toISOString() })
+      .eq("id", id);
+    if (error) { console.error("Update error:", error); return; }
     setApps(a => a.map(app => app.id === id ? { ...app, status } : app));
     if (selected?.id === id) setSelected(s => ({ ...s, status }));
   };
@@ -616,9 +637,11 @@ function AdminPanel() {
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: selected ? "1fr 1fr" : "1fr", gap: 20 }}>
-      {/* List */}
       <div>
-        <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 600, marginBottom: 6 }}>Applications</div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+          <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 600 }}>Applications</div>
+          <button onClick={loadApps} style={{ background: "none", border: `1px solid ${P.border}`, color: P.muted, borderRadius: 6, padding: "4px 12px", fontSize: 12, cursor: "pointer" }}>↻ Refresh</button>
+        </div>
         <div style={{ fontSize: 13, color: P.muted, marginBottom: 16 }}>{apps.filter(a=>a.status==="pending").length} pending review</div>
         <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
           {["all","pending","approved","rejected"].map(f=>(
@@ -627,59 +650,74 @@ function AdminPanel() {
             </button>
           ))}
         </div>
-        {filtered.map(app => (
+        {loading && <div style={{ textAlign: "center", padding: "40px 0", color: P.muted, fontSize: 13 }}>Loading applications…</div>}
+        {!loading && filtered.length === 0 && (
+          <div style={{ textAlign: "center", padding: "40px 0", color: P.muted, fontSize: 13 }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
+            <div>No {filter === "all" ? "" : filter} applications yet</div>
+          </div>
+        )}
+        {!loading && filtered.map(app => (
           <div key={app.id} className="admin-card" onClick={() => setSelected(app)} style={{ cursor: "pointer", borderColor: selected?.id===app.id?P.gold:P.border }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
               <div>
-                <div style={{ fontWeight: 500, fontSize: 14 }}>{app.shopName}</div>
-                <div style={{ fontSize: 12, color: P.muted }}>{app.ownerName} · {app.area}</div>
+                <div style={{ fontWeight: 500, fontSize: 14 }}>{app.shop_name}</div>
+                <div style={{ fontSize: 12, color: P.muted }}>{app.owner_name} · {app.area}</div>
               </div>
               <span className={`status-badge status-${app.status}`}>● {app.status}</span>
             </div>
-            <div style={{ fontSize: 12, color: P.muted }}>{app.barbers.length} barbers · {app.services.length} services · {app.calendarSystem}</div>
-            <div style={{ fontSize: 11, color: P.muted, marginTop: 4 }}>Submitted {app.submittedAt}</div>
+            <div style={{ fontSize: 12, color: P.muted }}>
+              {Array.isArray(app.barbers) ? app.barbers.length : 0} barbers · {Array.isArray(app.services) ? app.services.length : 0} services · {app.calendar_system}
+            </div>
+            <div style={{ fontSize: 11, color: P.muted, marginTop: 4 }}>
+              Submitted {new Date(app.created_at).toLocaleDateString("en-IE", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+            </div>
           </div>
         ))}
       </div>
 
-      {/* Detail */}
       {selected && (
         <div className="fade-in">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <div style={{ fontWeight: 500, fontSize: 16 }}>{selected.shopName}</div>
+            <div style={{ fontWeight: 500, fontSize: 16 }}>{selected.shop_name}</div>
             <button onClick={() => setSelected(null)} style={{ background: "none", border: `1px solid ${P.border}`, color: P.muted, borderRadius: 6, padding: "4px 10px", fontSize: 12, cursor: "pointer" }}>✕ Close</button>
           </div>
           <div className="card" style={{ marginBottom: 10 }}>
             <div className="section-label">Contact</div>
             <div style={{ fontSize: 13, color: P.muted, lineHeight: 1.9 }}>
-              <div>{selected.ownerName}</div>
+              <div>{selected.owner_name}</div>
               <div>{selected.email}</div>
               <div>{selected.phone}</div>
               <div>{selected.address}</div>
             </div>
           </div>
-          <div className="card" style={{ marginBottom: 10 }}>
-            <div className="section-label">Barbers</div>
-            {selected.barbers.map((b,i)=>(
-              <div key={i} style={{ fontSize: 13, padding: "5px 0", borderBottom: i<selected.barbers.length-1?`1px solid ${P.border}`:"none" }}>
-                <span style={{ fontWeight: 500 }}>{b.name}</span> · <span style={{ color: P.muted }}>{b.specialty}</span>
-              </div>
-            ))}
-          </div>
-          <div className="card" style={{ marginBottom: 10 }}>
-            <div className="section-label">Services</div>
-            {selected.services.map((s,i)=>(
-              <div key={i} style={{ display:"flex",justifyContent:"space-between",fontSize:13,padding:"5px 0",borderBottom:i<selected.services.length-1?`1px solid ${P.border}`:"none" }}>
-                <span>{s.name} <span style={{ color: P.muted }}>({s.duration}min)</span></span>
-                <span style={{ color: P.gold }}>€{s.price}</span>
-              </div>
-            ))}
-          </div>
+          {Array.isArray(selected.barbers) && selected.barbers.length > 0 && (
+            <div className="card" style={{ marginBottom: 10 }}>
+              <div className="section-label">Barbers ({selected.barbers.length})</div>
+              {selected.barbers.map((b,i)=>(
+                <div key={i} style={{ fontSize: 13, padding: "5px 0", borderBottom: i<selected.barbers.length-1?`1px solid ${P.border}`:"none" }}>
+                  <span style={{ fontWeight: 500 }}>{b.name}</span>
+                  {b.specialty?.length > 0 && <span style={{ color: P.muted }}> · {Array.isArray(b.specialty) ? b.specialty.join(", ") : b.specialty}</span>}
+                </div>
+              ))}
+            </div>
+          )}
+          {Array.isArray(selected.services) && selected.services.length > 0 && (
+            <div className="card" style={{ marginBottom: 10 }}>
+              <div className="section-label">Services ({selected.services.length})</div>
+              {selected.services.map((s,i)=>(
+                <div key={i} style={{ display:"flex",justifyContent:"space-between",fontSize:13,padding:"5px 0",borderBottom:i<selected.services.length-1?`1px solid ${P.border}`:"none" }}>
+                  <span>{s.name} <span style={{ color: P.muted }}>({s.duration}min)</span></span>
+                  <span style={{ color: P.gold }}>€{s.price}</span>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="card" style={{ marginBottom: 16 }}>
             <div className="section-label">Calendar & Hours</div>
-            <div style={{ fontSize: 13, color: P.muted }}>{selected.calendarSystem}{selected.calendlyUrl?` · ${selected.calendlyUrl}`:""}</div>
-            <div style={{ fontSize: 13, color: P.muted, marginTop: 4 }}>{selected.openingHours}</div>
-            {selected.experience && <div style={{ fontSize: 13, color: P.muted, marginTop: 8, fontStyle: "italic" }}>"{selected.experience}"</div>}
+            <div style={{ fontSize: 13, color: P.muted }}>{selected.calendar_system}{selected.calendly_url?` · ${selected.calendly_url}`:""}{selected.resurva_url?` · ${selected.resurva_url}`:""}</div>
+            <div style={{ fontSize: 13, color: P.muted, marginTop: 4 }}>{selected.opening_hours}</div>
+            {selected.about && <div style={{ fontSize: 13, color: P.muted, marginTop: 8, fontStyle: "italic" }}>"{selected.about}"</div>}
           </div>
           {selected.status === "pending" && (
             <div style={{ display: "flex", gap: 10 }}>
