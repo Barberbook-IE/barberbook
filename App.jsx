@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { saveBooking, markSlotBooked } from "./supabase.js";
 
 // ─── REAL DUBLIN DATA ────────────────────────────────────────────────────────
 const SHOPS = [
@@ -961,8 +962,25 @@ export default function App() {
 
   const handleSelectShop = (shop) => { setViewShop(shop); setViewBarber(null); setNav("find"); };
   const handleSelectBarber = (barber, shop) => { setViewBarber({barber,shop}); setViewShop(null); setNav("book"); };
-  const handleConfirmBooking = (b) => { setBooking(b); setNav("pay"); };
-  const handlePaySuccess = () => { setConfirmed(true); };
+  const handleConfirmBooking = async (b) => {
+    setBooking(b);
+    setNav("pay");
+  };
+  const handlePaySuccess = async () => {
+    if (booking) {
+      await saveBooking({
+        customerName: profile.name || "Guest",
+        customerEmail: profile.email || "",
+        customerPhone: profile.phone || "",
+        date: booking.date,
+        slot: booking.slot,
+        totalPrice: booking.totalPrice,
+        notes: booking.notes || "",
+      });
+      await markSlotBooked(booking.barber?.id, booking.date, booking.slot);
+    }
+    setConfirmed(true);
+  };
   const handleDone = () => { setConfirmed(false); setBooking(null); setViewBarber(null); setViewShop(null); setNav("find"); };
 
   const navItems = [

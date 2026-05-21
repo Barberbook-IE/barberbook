@@ -1,5 +1,6 @@
 // BarberOnboard.jsx — Full barber signup & admin review flow
 import { useState } from "react";
+import { saveApplication } from "./supabase.js";
 
 const P = {
   bg: "#0A0A0A", surface: "#141414", card: "#1C1C1C",
@@ -714,11 +715,13 @@ export default function BarberOnboard() {
   const [view, setView] = useState("join"); // "join" | "success" | "admin"
   const [submittedName, setSubmittedName] = useState("");
 
-  const handleSubmit = (form) => {
+  const handleSubmit = async (form) => {
+    const { error } = await saveApplication(form);
+    if (error) {
+      console.error("Failed to save application:", error);
+    }
     setSubmittedName(form.shopName);
     setView("success");
-    // TODO: POST to Supabase → await supabase.from('applications').insert(form)
-    console.log("Application submitted:", form);
   };
 
   return (
